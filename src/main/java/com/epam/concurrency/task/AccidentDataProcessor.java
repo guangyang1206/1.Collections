@@ -1,11 +1,14 @@
 package com.epam.concurrency.task;
 
-import com.epam.data.RoadAccident;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.epam.data.RoadAccident;
 
 /**
  * Created by Tanmoy on 6/17/2016.
@@ -39,11 +42,16 @@ public class AccidentDataProcessor {
         accidentDataWriter.init(OUTPUT_FILE_PATH);
     }
 
-    public void process(){
+    public void process(String processMethod){
+    	
         for (String accidentDataFile : fileQueue){
             log.info("Starting to process {} file ", accidentDataFile);
             accidentDataReader.init(DATA_PROCESSING_BATCH_SIZE, accidentDataFile);
-            processFile();
+            if("parallel".equalsIgnoreCase(processMethod)){
+            	parallelProcessFile();
+            }else{
+            	processFile();
+            }
         }
     }
 
@@ -58,15 +66,60 @@ public class AccidentDataProcessor {
             log.info("Written records");
         }
     }
+    
+	private void parallelProcessFile() {
+		int batchCount = 1;
+		int threadNum = 5;
+		ExecutorService executorService = Executors.newFixedThreadPool(threadNum);
+		while (!accidentDataReader.hasFinished()) {
+			List<RoadAccident> roadAccidents = accidentDataReader.getNextBatch();
+			if (roadAccidents != null && roadAccidents.size() > 0) {
+				log.info("Read [{}] records in batch [{}]", roadAccidents.size(), batchCount++);
+				executorService.execute(new ParallelDataProcessor(roadAccidents, accidentDataEnricher, accidentDataWriter));
+			}
+		}
+		Util.sleepToSimulateDataHeavyProcessing(1000);
+		if (executorService.isTerminated()) {
+            	log.info("Success");
+		}
+		executorService.shutdown();
 
+	}
 
     public static void main(String[] args) {
         AccidentDataProcessor dataProcessor = new AccidentDataProcessor();
         long start = System.currentTimeMillis();
         dataProcessor.init();
-        dataProcessor.process();
+        dataProcessor.process("parallel");
+        //dataProcessor.process("");
         long end = System.currentTimeMillis();
         System.out.println("Process finished in s : " + (end-start)/1000);
     }
 
+}
+
+class ParallelDataProcessor implements Runnable {
+	private Logger log = LoggerFactory.getLogger(ParallelDataProcessor.class);
+
+	private AccidentDataEnricher accidentDataEnricher;
+
+	private List<RoadAccident> roadAccidents;
+
+	private AccidentDataWriter accidentDataWriter;
+
+	public ParallelDataProcessor( List<RoadAccident> roadAccidents, AccidentDataEnricher accidentDataEnricher,
+			AccidentDataWriter accidentDataWriter) {
+		this.accidentDataEnricher = accidentDataEnricher;
+		this.roadAccidents = roadAccidents;
+		this.accidentDataWriter = accidentDataWriter;
+	}
+
+	@Override
+	public void run() {
+		List<RoadAccidentDetails> roadAccidentDetailsList = accidentDataEnricher.enrichRoadAccidentData(roadAccidents);
+		log.info(String.format("Enriched records"));
+		accidentDataWriter.writeAccidentData(roadAccidentDetailsList);
+		log.info(String.format("Written records"));
+
+	}
 }
