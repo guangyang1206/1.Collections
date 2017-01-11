@@ -32,8 +32,19 @@ public class AccidentDataProcessor {
 
     private Logger log = LoggerFactory.getLogger(AccidentDataProcessor.class);
 
-
-    public void init(){
+    /*Constructor*/
+    public AccidentDataProcessor(){
+    	
+    }
+    
+    public AccidentDataProcessor(AccidentDataReader accidentDataReader, AccidentDataEnricher accidentDataEnricher,
+    		AccidentDataWriter accidentDataWriter){
+    	this.accidentDataReader = accidentDataReader;
+    	this.accidentDataEnricher = accidentDataEnricher;
+    	this.accidentDataWriter = accidentDataWriter;
+    } /*Constructor Ended*/
+    
+	public void init(){
         fileQueue.add(FILE_PATH_1);
         //fileQueue.add(FILE_PATH_2);
         //fileQueue.add(FILE_PATH_3);
@@ -94,6 +105,14 @@ public class AccidentDataProcessor {
         //dataProcessor.process("");
         long end = System.currentTimeMillis();
         System.out.println("Process finished in s : " + (end-start)/1000);
+    }
+
+    public void setFileQueue(List<String> fileQueue){
+    	this.fileQueue = fileQueue;
+    }
+    
+    public List<String> getFileQueue(){
+    	return fileQueue;
     }
 
 }
